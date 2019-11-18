@@ -44,7 +44,7 @@ void draw(){
   println(p);
   println();
   
-  if (p > -30250){//--------------------------------------------------------------------------
+  if (p > -30250){
        // Initialize one bubble
     if (millis() - timeCheck > timeInterval){
       pushMatrix();
@@ -136,7 +136,7 @@ class Bubble {
   void move(){
     
     //////////////////if hold in a middle position
-    if (qx < 220 && qx > 150 && qz > 330 ){//--------------------------------------
+    if (qx < 220 && qx > 150 && qz > 330 ){
       xspeed = random (p/30000, -p/30000);
       yspeed = random (p/30000, -p/30000);
       velocity.x += xspeed;
@@ -178,7 +178,7 @@ class Bubble {
   
   void grow(){
     println(growing);
-    if (growing){//-----------------------------------------------------
+    if (growing){
      r -= p/20000;
      ellipseSize = r;
     }
