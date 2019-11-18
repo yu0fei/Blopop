@@ -1,0 +1,231 @@
+import processing.serial.*;
+
+Serial myPort;  // Create object from Serial class
+
+String s = "qx, qy, qz, p";
+String[] q = splitTokens(s, "\t ");
+float qx;
+float qy;
+float qz;
+int p;
+
+float r;
+float rotation = 0;
+float spring = 0.5;
+
+int timeCheck;
+int timeInterval = 500;
+
+ //Where we store all out bubbles.
+ArrayList<Bubble> bubbles;
+int totalBubbles = 0;
+
+void setup(){
+   //size(800, 800);
+  fullScreen();
+  timeCheck = millis();
+  
+  print(Serial.list());
+  String portName = Serial.list()[1];//prototype:1  trial:6------------also change bluetooth
+  myPort = new Serial(this, portName, 9600);
+  myPort.bufferUntil('\n');
+  
+  bubbles = new ArrayList<Bubble>();
+}
+
+void draw(){
+  background(0);
+  println("Accelerometer=");
+  println(qx); 
+  println(qy); 
+  println(qz);  
+  println();
+  print("Pressure=");
+  println(p);
+  println();
+  
+  if (p > -30250){//--------------------------------------------------------------------------
+       // Initialize one bubble
+    if (millis() - timeCheck > timeInterval){
+      pushMatrix();
+      bubbles.add(new Bubble(new PVector(width/2, height/2)));
+      //bubbles.get(totalBubbles).growing = true;
+      timeCheck = millis();
+      // Increment totalBubbles
+      totalBubbles++;
+      rotation -= 0.002;
+      rotate(rotation);
+      popMatrix();
+    } 
+    } else {
+       for (int i = 0; i < bubbles.size(); i++) {
+         bubbles.get(i).growing = false;
+       }
+      }
+  
+  for (Bubble b : bubbles) {
+    b.grow();
+    b.display(); //Draw the Bubble.
+    b.move(); //Move the Bubble.
+    b.collide();
+  }
+    //Iterate through all the bubbles in our ArrayList.
+  for (int i = 0; i < bubbles.size(); i++) {
+    Bubble b = bubbles.get(i); //Get every individual bubble and set it to 'b'.
+    if (b.dead) { //Is the bubble dead? (Is dead = true).
+      bubbles.remove(b); //Remove the bubble from the arrayList.
+    }
+  }
+  
+}
+
+class Bubble {
+  PVector loc;          //Location
+  PVector velocity;     //Velocity of the bubble
+  PVector acceleration; //Acceleration of the bubble
+  PVector attraction;
+
+  //Is the bubble gone or still on screen?
+  boolean dead = false;
+  boolean growing = false;
+  
+  float xspeed = 0;
+  float yspeed = 0;
+  float r;
+  float ellipseSize;
+  int collisions = 0;
+  //Change colors but keep them at a certain tone.
+  int l = 50;
+
+  Bubble(PVector loc_){
+    loc = loc_;
+    r = 0;
+    attraction = new PVector (0, 0);
+    velocity = new PVector(0, 0);
+    acceleration = new PVector(0, 0);
+    growing = true;
+    
+
+  }
+  
+  void display(){
+
+    for (int l=50; l < 160; l++){
+    l++;
+    fill(64, 255, 255, l);
+    }
+    noStroke();
+    ellipse(loc.x, loc.y, r, r);
+
+  }
+
+  
+  void applyForce(){
+    float accx = map (qx, 0, 360, -180, 180);
+    float accy = map (qz, 0, 360, -180, 180);
+    print("accx");
+    println(accx);
+    print("accy");
+    println(accy);
+
+    attraction = new PVector(accy*noise(-1,1), accx*noise(-1, 1));
+    attraction.normalize();
+    acceleration.add(attraction);
+  }
+  
+  void move(){
+    
+    //////////////////if hold in a middle position
+    if (qx < 220 && qx > 150 && qz > 330 ){//--------------------------------------
+      xspeed = random (p/30000, -p/30000);
+      yspeed = random (p/30000, -p/30000);
+      velocity.x += xspeed;
+      velocity.y += yspeed;
+      println(xspeed);
+      loc.x -= velocity.x;
+      loc.y += velocity.y;
+      
+    }
+    
+    /////////////////if control direction by swing the device to left/right
+    else {
+    applyForce();
+    // Motion 101!  Velocity changes by acceleration.  Location changes by velocity.
+    velocity.add(acceleration);
+    velocity.mult(0.7);
+    loc.add(velocity);
+
+    acceleration.mult(0);
+    }
+    
+    if (loc.x + r/2 > width) {
+      loc.x = width - r/2;
+      velocity.x = - 0.7*velocity.x; 
+    }
+    else if (loc.x - r/2 < 0) {
+      loc.x = r/2;
+      velocity.x = - 0.7*velocity.x; 
+    }
+    if (loc.y + r/2 > height) {
+      loc.y = height - r/2;
+      velocity.y = - 0.7*velocity.y;
+    } 
+    else if (loc.y - r/2 < 0) {
+      loc.y = r/2;
+      velocity.y = - 0.7*velocity.y;
+    }
+  }
+  
+  void grow(){
+    println(growing);
+    if (growing){//-----------------------------------------------------
+     r -= p/20000;
+     ellipseSize = r;
+    }
+    if (collisions >= 1000) {
+      dead = true;
+    }
+  }
+  
+  void collide(){
+
+      for (int i = 0; i < bubbles.size(); i++) {
+      
+        PVector other = bubbles.get(i).loc;
+        float otherSize = bubbles.get(i).ellipseSize;
+        float d = PVector.dist(other, loc);
+        float dmin = otherSize/2 + ellipseSize/2;
+
+        if (d < dmin){
+          
+          collisions++;
+          
+        float angle = atan2(bubbles.get(i).loc.y - loc.y, bubbles.get(i).loc.x - loc.x);
+        float targetX = loc.x + cos(angle) * dmin;
+        float targetY = loc.y + sin(angle) * dmin;
+        float ax = (targetX - bubbles.get(i).loc.x) * spring;
+        float ay = (targetY - bubbles.get(i).loc.y) * spring;
+        velocity.x -= ax;
+        velocity.y -= ay;
+        bubbles.get(i).velocity.x += ax;
+        bubbles.get(i).velocity.y += ay;
+        }
+    }
+  }
+
+}
+
+void serialEvent(Serial myPort) { 
+
+  String myString = myPort.readStringUntil('\n');
+  if (myString != null) {
+  myString = trim(myString);
+  String q[] = split(myString, '\t'); 
+    if (q.length > 3) {
+      qx = int(q[0]);
+      qy = int(q[1]); 
+      qz = int(q[2]);
+      p = int(q[3]);
+    }
+  } 
+}
